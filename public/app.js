@@ -88,7 +88,7 @@ function renderPlatforms() {
     <button class="platform-card ${platform.id === state.active ? 'active' : ''} ${platform.status !== 'live' ? 'restricted' : ''}" data-platform="${platform.id}">
       <div class="pc-top"><span class="pc-logo">${initials(platform.name)}</span><span class="pc-state ${platform.status}"></span></div>
       <h3>${escapeHtml(platform.name)} <small>· ${escapeHtml(platform.region)}</small></h3>
-      <p>${platform.status === 'live' ? (platform.coverageLabel || `官方 Top ${platform.coverage}`) : '等待官方授权'}</p>
+      <p>${platform.status === 'live' ? (platform.coverageLabel || `官方 Top ${platform.coverage}`) : '暂无公开 Top 100'}</p>
     </button>`).join('');
 }
 
@@ -97,7 +97,7 @@ function renderSources() {
     <article class="source-card">
       <div class="source-icon">${initials(platform.name)}</div>
       <div><h3>${escapeHtml(platform.name)} · ${escapeHtml(platform.source)}</h3><p>${escapeHtml(platform.note)}</p><a href="${platform.sourceUrl}" target="_blank" rel="noreferrer">查看官方来源 ↗</a></div>
-      <span class="source-status ${platform.status}">${platform.status === 'live' ? '已接入' : '需授权'}</span>
+      <span class="source-status ${platform.status}">${platform.status === 'live' ? '已接入' : '无公开榜单'}</span>
     </article>`).join('');
 }
 
@@ -150,11 +150,11 @@ function renderRestricted(platform) {
   state.charts = [];
   state.chart = '';
   renderChartSelect();
-  $('#ranking-name').textContent = `${platform.name} · 官方接入待授权`;
+  $('#ranking-name').textContent = `${platform.name} · 官方 Top 100 暂不可用`;
   $('#ranking-meta').textContent = `${platform.region} · ${platform.source}`;
   $('#active-logo').textContent = initials(platform.name);
   $('#ranking-body').innerHTML = `<tr><td colspan="6"><div class="empty"><b>不展示未经授权的“伪官方榜单”</b><p>${escapeHtml(platform.note)}</p><a class="external" style="margin:16px auto;width:120px" href="${platform.sourceUrl}" target="_blank" rel="noreferrer">官方接入说明 ↗</a></div></td></tr>`;
-  $('#provenance').textContent = `状态：需通过 ${platform.source} 获得官方授权`;
+  $('#provenance').textContent = `状态：${platform.source} 暂无可匿名访问的统一生态榜单`;
   $('#pagination').innerHTML = '';
 }
 
