@@ -13,9 +13,9 @@ const platforms = [
   { id: 'apple-us', name: 'Apple', region: '美国', group: 'global', status: 'live', coverage: 100, metric: '免费游戏榜', source: 'Apple iTunes RSS', sourceUrl: 'https://itunes.apple.com/us/rss/topfreeapplications/limit=100/genre=6014/json', note: 'App Store 美国区免费游戏 Top 100。' },
   { id: 'apple-cn', name: 'Apple', region: '中国', group: 'china', status: 'live', coverage: 100, metric: '免费游戏榜', source: 'Apple iTunes RSS', sourceUrl: 'https://itunes.apple.com/cn/rss/topfreeapplications/limit=100/genre=6014/json', note: 'App Store 中国区免费游戏 Top 100。' },
   { id: 'wechat', name: '微信小游戏', region: '中国', group: 'china', status: 'live', coverage: 21, coverageLabel: '21 个官方榜单', metric: '分类与生态榜', source: '微信小游戏官网', sourceUrl: 'https://xiaoyouxi.qq.com/rankcategory.html', note: '腾讯官方公开排行榜，收录 21 个榜单；网页公开每榜前 5 名预览，完整列表需微信客户端凭证。' },
-  { id: 'douyin', name: '抖音小游戏', region: '中国', group: 'china', status: 'restricted', coverage: 0, metric: '热玩榜', source: '抖音开放平台', sourceUrl: 'https://developer.open-douyin.com/', note: '榜单数据需通过开放平台主体资质申请，当前不展示非官方抓取结果。' },
+  { id: 'douyin', name: '抖音小游戏', region: '中国', group: 'china', status: 'restricted', coverage: 0, metric: '热玩榜', source: '抖音开放平台', sourceUrl: 'https://developer.open-douyin.com/docs/resource/zh-CN/mini-game/develop/guide/open-ability/ImRankIntroduce', note: '公开文档中的排行榜能力是单款游戏内的玩家及好友榜，并非全平台小游戏生态榜；目前未发现可匿名访问的官方 Top 100 数据源。' },
   { id: 'bilibili', name: '哔哩哔哩', region: '中国', group: 'china', status: 'restricted', coverage: 0, metric: '游戏榜', source: '哔哩哔哩游戏中心', sourceUrl: 'https://game.bilibili.com/', note: '未发现稳定公开官方 Top 100 API，等待商务/开放平台授权。' },
-  { id: 'taptap', name: 'TapTap', region: '中国', group: 'china', status: 'restricted', coverage: 0, metric: '热门榜', source: 'TapTap 开发者中心', sourceUrl: 'https://developer.taptap.cn/', note: '开放能力主要面向自有应用，跨应用榜单接口需平台授权。' },
+  { id: 'taptap', name: 'TapTap', region: '中国', group: 'china', status: 'live', coverage: 100, coverageLabel: '4 个官方 Top 100', metric: '热门榜', source: 'TapTap 官方榜单', sourceUrl: 'https://www.taptap.cn/top/download', note: 'TapTap 官方公开榜单，收录热门、热玩、预约和新品 4 个榜单，每榜同步前 100 名。' },
   { id: 'google', name: 'Google Play', region: '全球', group: 'global', status: 'restricted', coverage: 0, metric: '热门免费游戏', source: 'Google Play Console', sourceUrl: 'https://play.google.com/console/about/', note: '官方 API 不公开跨应用排行榜；需获授权的数据合作。' },
   { id: 'meta', name: 'Meta', region: '全球', group: 'global', status: 'restricted', coverage: 0, metric: 'Instant Games', source: 'Meta for Developers', sourceUrl: 'https://developers.facebook.com/docs/games/', note: '官方 Graph API 不提供生态 Top 100 公榜。' },
   { id: 'tiktok', name: 'TikTok', region: '全球', group: 'global', status: 'restricted', coverage: 0, metric: 'Mini Games', source: 'TikTok for Developers', sourceUrl: 'https://developers.tiktok.com/', note: '需平台合作权限，当前不以网页热度替代官方排行。' }
@@ -205,6 +205,67 @@ async function loadWechat() {
   return charts;
 }
 
+const TAPTAP_CHARTS = [
+  { id: 'hot', path: 'download' },
+  { id: 'pop', path: 'played' },
+  { id: 'reserve', path: 'reserve' },
+  { id: 'new', path: 'new' }
+];
+
+const TAPTAP_X_UA = 'V=1&PN=WebApp&LANG=zh_CN&VN_CODE=100000000&LOC=CN&PLT=PC&DS=Android&UID=00000000-0000-4000-8000-000000000000&DT=PC';
+
+async function loadTaptapChart(chart) {
+  const pages = await Promise.all(Array.from({ length: 10 }, async (_, page) => {
+    const params = new URLSearchParams({
+      type_name: chart.id,
+      limit: '10',
+      from: String(page * 10),
+      platform: 'android'
+    });
+    const payload = await officialFetch(`https://www.taptap.cn/webapiv2/app-top/v2/hits?${params}`, {
+      headers: { 'X-UA': TAPTAP_X_UA, Referer: `https://www.taptap.cn/top/${chart.path}` }
+    });
+    if (!payload.success || !Array.isArray(payload.data?.list)) throw new Error(`TapTap ${chart.id} 榜单响应异常`);
+    return payload.data;
+  }));
+  const metadata = pages[0];
+  const apps = pages.flatMap((page) => page.list).slice(0, 100);
+  return {
+    id: chart.id,
+    name: metadata.title || chart.id,
+    description: metadata.description || '',
+    sourceUrl: `https://www.taptap.cn/top/${chart.path}`,
+    count: apps.length,
+    items: apps.map((entry, index) => {
+      const app = entry.app || {};
+      const rating = Number(app.stat?.rating?.score);
+      return {
+        rank: index + 1,
+        id: String(app.id || entry.identification || index + 1),
+        name: app.title || '未知游戏',
+        developer: '厂商未在榜单公开',
+        publisher: '厂商未在榜单公开',
+        summary: stripHtml(app.description?.text || app.rec_text || `${metadata.title || 'TapTap'}上榜游戏`),
+        genres: (app.tags || []).map((tag) => tag.value).filter(Boolean).slice(0, 3),
+        image: app.icon?.url || app.icon?.original_url || '',
+        url: `https://www.taptap.cn/app/${app.id}`,
+        metric: index + 1,
+        metricLabel: `${metadata.title || '榜单'}排名`,
+        secondaryMetric: null,
+        secondaryLabel: '',
+        releaseDate: app.released_time ? new Date(app.released_time * 1000).toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' }) : '—',
+        price: Number.isFinite(rating) && rating > 0 ? `评分 ${rating.toFixed(1)}` : '—'
+      };
+    })
+  };
+}
+
+async function loadTaptap() {
+  const charts = await Promise.all(TAPTAP_CHARTS.map(loadTaptapChart));
+  if (charts.some((chart) => chart.count < 100)) throw new Error('TapTap 官方榜单未返回完整 Top 100');
+  return charts;
+}
+
 async function rankings(req, res, url) {
   const id = url.searchParams.get('platform') || 'steam';
   const force = url.searchParams.get('refresh') === '1';
@@ -214,9 +275,15 @@ async function rankings(req, res, url) {
     return json(res, 403, { error: '该平台暂无公开官方 Top 100 接口', platform });
   }
   try {
-    const loader = id === 'steam' ? () => loadSteam(force) : id === 'wechat' ? loadWechat : () => loadApple(id.endsWith('-cn') ? 'cn' : 'us');
+    const loader = id === 'steam'
+      ? () => loadSteam(force)
+      : id === 'wechat'
+        ? loadWechat
+        : id === 'taptap'
+          ? loadTaptap
+          : () => loadApple(id.endsWith('-cn') ? 'cn' : 'us');
     const result = await cached(id, loader, force);
-    const charts = id === 'wechat' ? result.data : null;
+    const charts = ['wechat', 'taptap'].includes(id) ? result.data : null;
     const requestedChart = url.searchParams.get('chart');
     const activeChart = charts ? (charts.find((chart) => chart.id === requestedChart) || charts.find((chart) => chart.name.includes('人气')) || charts[0]) : null;
     const items = activeChart ? activeChart.items : result.data;
@@ -224,16 +291,16 @@ async function rankings(req, res, url) {
       platform,
       items,
       count: items.length,
-      charts: charts?.map(({ id: chartId, name, count }) => ({ id: chartId, name, count })) || [],
-      activeChart: activeChart ? { id: activeChart.id, name: activeChart.name } : null,
+      charts: charts?.map(({ id: chartId, name, count, description, sourceUrl }) => ({ id: chartId, name, count, description, sourceUrl })) || [],
+      activeChart: activeChart ? { id: activeChart.id, name: activeChart.name, description: activeChart.description, sourceUrl: activeChart.sourceUrl } : null,
       updatedAt: new Date(result.at).toISOString(),
       cached: result.cached,
-      provenance: { official: true, source: platform.source, sourceUrl: platform.sourceUrl }
+      provenance: { official: true, source: platform.source, sourceUrl: activeChart?.sourceUrl || platform.sourceUrl }
     });
   } catch (error) {
     const previous = cache.get(id);
     if (previous) {
-      const fallbackData = id === 'wechat' ? previous.data[0]?.items || [] : previous.data;
+      const fallbackData = ['wechat', 'taptap'].includes(id) ? previous.data[0]?.items || [] : previous.data;
       return json(res, 200, { platform, items: fallbackData, count: fallbackData.length, updatedAt: new Date(previous.at).toISOString(), cached: true, stale: true, warning: error.message, provenance: { official: true, source: platform.source, sourceUrl: platform.sourceUrl } });
     }
     json(res, 502, { error: '官方数据源暂时不可用', detail: error.message, platform });

@@ -124,7 +124,7 @@ async function loadRanking(id, refresh = false, chart = '') {
     renderChartSelect();
     $('#stat-records').textContent = data.count;
     $('#ranking-name').textContent = `${data.platform.name} · ${data.activeChart?.name || data.platform.metric}`;
-    $('#ranking-meta').textContent = `${data.platform.region} · ${data.activeChart ? `共 ${data.charts.length} 个官方榜单 · 当前公开 ${data.count} 名 · ` : ''}更新于 ${formatTime(data.updatedAt)}${data.cached ? ' · 缓存' : ' · 刚刚同步'}`;
+    $('#ranking-meta').textContent = `${data.platform.region} · ${data.activeChart ? `共 ${data.charts.length} 个官方榜单 · 当前公开 ${data.count} 名${data.activeChart.description ? ` · ${data.activeChart.description}` : ''} · ` : ''}更新于 ${formatTime(data.updatedAt)}${data.cached ? ' · 缓存' : ' · 刚刚同步'}`;
     $('#active-logo').textContent = initials(data.platform.name);
     $('#provenance').innerHTML = `来源：<a href="${data.provenance.sourceUrl}" target="_blank" rel="noreferrer">${escapeHtml(data.provenance.source)} ↗</a> · 官方一手数据 · ${data.stale ? '源暂时异常，展示上次成功数据' : '校验通过'}`;
     renderTable();
